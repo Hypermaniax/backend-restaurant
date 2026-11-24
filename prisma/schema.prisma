@@ -278,6 +278,8 @@ model Order {
   total                  Int
   currency               String        @default("IDR")
   customerName           String?       @map("customer_name")
+  customerEmail          String?       @map("customer_email")
+  receiptEmailSentAt     DateTime?     @map("receipt_email_sent_at") @db.Timestamptz(6)
   notes                  String?
   taxRateBp              Int           @map("tax_rate_bp")
   taxInclusive           Boolean       @map("tax_inclusive")

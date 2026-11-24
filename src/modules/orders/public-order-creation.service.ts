@@ -97,6 +97,7 @@ export class PublicOrderCreationService {
             paymentStatus: PaymentStatus.PENDING,
             currency: 'IDR',
             customerName: dto.customerName ?? null,
+            customerEmail: dto.customerEmail ?? null,
             notes: dto.notes ?? null,
             expiresAt: new Date(
               now.getTime() + settings.cashExpiryMinutes * 60_000,

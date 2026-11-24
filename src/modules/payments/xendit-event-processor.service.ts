@@ -6,6 +6,7 @@ import {
 } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderPaymentStateService } from '../orders/order-payment-state.service';
+import { OrderReceiptService } from '../orders/order-receipt.service';
 import { OrderQueryService } from '../orders/order-query.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { PaymentRepository, type PaymentRecord } from './payment.repository';
@@ -19,6 +20,7 @@ export class XenditEventProcessorService {
     private readonly orderQuery: OrderQueryService,
     private readonly paymentState: OrderPaymentStateService,
     private readonly realtime: RealtimeService,
+    private readonly receipts: OrderReceiptService,
   ) {}
 
   async processEvent(
@@ -116,6 +118,7 @@ export class XenditEventProcessorService {
     });
 
     if (paid) {
+      void this.receipts.sendForOrder(payment.order.outletId, payment.order.id);
       const order = await this.orderQuery
         .getKdsOrder(payment.order.outletId, payment.order.id)
         .catch(() => null);

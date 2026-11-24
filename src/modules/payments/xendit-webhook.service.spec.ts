@@ -10,6 +10,7 @@ import type { ConfigService } from '@nestjs/config';
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { OrderPaymentStateService } from '../orders/order-payment-state.service';
 import type { OrderQueryService } from '../orders/order-query.service';
+import type { OrderReceiptService } from '../orders/order-receipt.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import type { PaymentRecord, PaymentRepository } from './payment.repository';
 import { XenditEventProcessorService } from './xendit-event-processor.service';
@@ -73,12 +74,14 @@ function buildService() {
     getOrThrow: jest.fn().mockReturnValue('webhook-token'),
     get: jest.fn().mockReturnValue(undefined),
   };
+  const receipts = { sendForOrder: jest.fn() };
   const processor = new XenditEventProcessorService(
     prisma as unknown as PrismaService,
     payments as unknown as PaymentRepository,
     orders as unknown as OrderQueryService,
     orders as unknown as OrderPaymentStateService,
     realtime as unknown as RealtimeService,
+    receipts as unknown as OrderReceiptService,
   );
   const service = new XenditWebhookService(
     payments as unknown as PaymentRepository,
@@ -86,7 +89,7 @@ function buildService() {
     processor,
   );
 
-  return { service, prisma, payments, orders, realtime, config };
+  return { service, prisma, payments, orders, realtime, receipts, config };
 }
 
 describe('XenditWebhookService', () => {

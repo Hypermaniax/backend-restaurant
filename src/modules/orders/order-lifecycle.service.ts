@@ -13,6 +13,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { TableSessionService } from '../tables/table-session.service';
+import { OrderReceiptService } from './order-receipt.service';
 import type { AuthUser } from '../security/types/auth-user';
 import type { CancelOrderDto, ConfirmOrderPaymentDto } from './dto/order.dto';
 import { recordQueueAssigned } from './order.audit';
@@ -29,6 +31,8 @@ export class OrderLifecycleService {
     private readonly orders: OrderRepository,
     private readonly audit: AuditService,
     private readonly realtime: RealtimeService,
+    private readonly sessions: TableSessionService,
+    private readonly receipts: OrderReceiptService,
   ) {}
 
   async confirmPayment(
@@ -139,6 +143,8 @@ export class OrderLifecycleService {
       return saved;
     });
 
+    void this.receipts.sendForOrder(order.outletId, order.id);
+
     const kdsOrder = toKdsOrderView(order);
     this.realtime.emitOrderPaid(order.outletId, { order: kdsOrder });
     const queue = toDisplayQueueItem(order);
@@ -227,6 +233,10 @@ export class OrderLifecycleService {
       }
       return saved;
     });
+
+    if (order.sessionId) {
+      await this.sessions.closeIfIdle(order.outletId, order.sessionId);
+    }
 
     this.realtime.emitOrderCancelled(order.outletId, {
       order: toKdsOrderView(order),

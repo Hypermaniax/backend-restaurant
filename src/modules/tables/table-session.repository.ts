@@ -26,6 +26,13 @@ export class TableSessionRepository {
     });
   }
 
+  async findOpenById(sessionId: string, tx?: Prisma.TransactionClient) {
+    const client = tx ?? this.prisma;
+    return client.tableSession.findFirst({
+      where: { id: sessionId, status: TableSessionStatus.OPEN },
+    });
+  }
+
   async create(
     data: Prisma.TableSessionUncheckedCreateInput,
     tx?: Prisma.TransactionClient,
@@ -36,7 +43,7 @@ export class TableSessionRepository {
 
   async close(
     sessionId: string,
-    closedByUserId: string,
+    closedByUserId: string | null,
     tx?: Prisma.TransactionClient,
   ) {
     const client = tx ?? this.prisma;

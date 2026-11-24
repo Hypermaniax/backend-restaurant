@@ -5,6 +5,7 @@ import {
   PaymentStatus,
 } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { TableSessionService } from '../tables/table-session.service';
 import { OrderRepository } from './order.repository';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class OrderExpiryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orders: OrderRepository,
+    private readonly sessions: TableSessionService,
   ) {}
 
   async expireStaleOrders(now = new Date()): Promise<number> {
@@ -56,6 +58,9 @@ export class OrderExpiryService {
 
       if (changed) {
         expired += 1;
+        if (stale.sessionId) {
+          await this.sessions.closeIfIdle(stale.outletId, stale.sessionId);
+        }
       }
     }
 

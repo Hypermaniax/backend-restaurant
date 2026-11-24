@@ -18,6 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { SettingsService } from '../settings/settings.service';
 import { TableSessionService } from '../tables/table-session.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { OrderReceiptService } from './order-receipt.service';
 import type { AuthUser } from '../security/types/auth-user';
 import type { CreateCashierOrderDto } from './dto/order.dto';
 import { recordQueueAssigned } from './order.audit';
@@ -50,6 +51,7 @@ export class CashierOrderCreationService {
     private readonly sessions: TableSessionService,
     private readonly audit: AuditService,
     private readonly realtime: RealtimeService,
+    private readonly receipts: OrderReceiptService,
   ) {}
 
   async createCashierOrder(
@@ -93,7 +95,7 @@ export class CashierOrderCreationService {
       const order = await this.prisma.$transaction(async (tx) => {
         const session =
           dto.orderType === OrderType.DINE_IN
-            ? await this.sessions.requireSessionForOrder(
+            ? await this.sessions.ensureSessionForOrder(
                 outletId,
                 dto.tableId!,
                 tx,
@@ -139,6 +141,7 @@ export class CashierOrderCreationService {
               : PaymentStatus.PAID,
             currency: 'IDR',
             customerName: dto.customerName ?? null,
+            customerEmail: dto.customerEmail ?? null,
             notes: dto.notes ?? null,
             expiresAt: new Date(
               now.getTime() + settings.orderExpiryMinutes * 60_000,
@@ -224,6 +227,10 @@ export class CashierOrderCreationService {
         }
         return saved;
       });
+
+      if (!awaitingQris) {
+        void this.receipts.sendForOrder(outletId, order.id);
+      }
 
       const kdsOrder = toKdsOrderView(order);
       this.realtime.emitOrderCreated(order.outletId, { order: kdsOrder });

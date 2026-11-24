@@ -99,6 +99,13 @@ export class OrderRepository {
     return client.order.create({ data, include: ORDER_INCLUDE });
   }
 
+  async markReceiptEmailSent(outletId: string, orderId: string) {
+    await this.prisma.order.updateMany({
+      where: { id: orderId, outletId, receiptEmailSentAt: null },
+      data: { receiptEmailSentAt: new Date() },
+    });
+  }
+
   async createPayment(
     data: Prisma.PaymentUncheckedCreateInput,
     tx?: Prisma.TransactionClient,
@@ -304,7 +311,7 @@ export class OrderRepository {
         status: { in: ['PENDING_PAYMENT', 'AWAITING_CASH'] },
         expiresAt: { lte: now },
       },
-      select: { id: true, outletId: true, status: true },
+      select: { id: true, outletId: true, status: true, sessionId: true },
       orderBy: { expiresAt: 'asc' },
       take,
     });

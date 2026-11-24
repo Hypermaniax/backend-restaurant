@@ -47,6 +47,7 @@ function buildService() {
   };
   const sessions = {
     findOpenByTable: jest.fn(),
+    findOpenById: jest.fn(),
     create: jest.fn(),
     close: jest.fn(),
     countBlockingOrders: jest.fn(),
@@ -96,6 +97,41 @@ describe('TableSessionService', () => {
     ).rejects.toThrow(BadRequestException);
     expect(sessions.close).not.toHaveBeenCalled();
     expect(tables.updateStatus).not.toHaveBeenCalled();
+  });
+
+  it('auto-closes an idle session and marks the table available', async () => {
+    const { service, tables, sessions, realtime } = buildService();
+    sessions.findOpenById.mockResolvedValue(openSession);
+    sessions.countBlockingOrders.mockResolvedValue(0);
+    sessions.close.mockResolvedValue({
+      ...closedSession,
+      closedByUserId: null,
+    });
+
+    const closed = await service.closeIfIdle('outlet-1', 'session-1');
+
+    expect(closed).toBe(true);
+    expect(tables.updateStatus).toHaveBeenCalledWith(
+      'outlet-1',
+      'table-1',
+      'AVAILABLE',
+      expect.anything(),
+    );
+    expect(realtime.emitSessionClosed).toHaveBeenCalledWith('outlet-1', {
+      sessionId: 'session-1',
+      tableId: 'table-1',
+    });
+  });
+
+  it('keeps a session open when active orders remain', async () => {
+    const { service, sessions } = buildService();
+    sessions.findOpenById.mockResolvedValue(openSession);
+    sessions.countBlockingOrders.mockResolvedValue(1);
+
+    await expect(service.closeIfIdle('outlet-1', 'session-1')).resolves.toBe(
+      false,
+    );
+    expect(sessions.close).not.toHaveBeenCalled();
   });
 
   it('closes a session and marks the table available', async () => {

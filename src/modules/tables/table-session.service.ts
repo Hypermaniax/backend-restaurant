@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -19,6 +20,8 @@ import type { TableSessionView, TableWithOpenSession } from './table.types';
 
 @Injectable()
 export class TableSessionService {
+  private readonly logger = new Logger(TableSessionService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly tables: TableRepository,
@@ -95,21 +98,45 @@ export class TableSessionService {
     return toSessionView(session);
   }
 
-  async requireSessionForOrder(
-    outletId: string,
-    tableId: string,
-    tx: Prisma.TransactionClient,
-  ): Promise<TableSessionView> {
-    const table = await this.tables.findById(outletId, tableId, tx);
-    if (!table || !table.isActive) {
-      throw new BadRequestException('Meja tidak ditemukan atau nonaktif');
+  async closeIfIdle(outletId: string, sessionId: string): Promise<boolean> {
+    const closed = await this.prisma.$transaction(async (tx) => {
+      const open = await this.sessions.findOpenById(sessionId, tx);
+      if (!open) {
+        return null;
+      }
+
+      const blocking = await this.sessions.countBlockingOrders(sessionId, tx);
+      if (blocking > 0) {
+        return null;
+      }
+
+      await this.sessions.close(sessionId, null, tx);
+      await this.tables.updateStatus(
+        outletId,
+        open.tableId,
+        TableStatus.AVAILABLE,
+        tx,
+      );
+      return { tableId: open.tableId };
+    });
+
+    if (!closed) {
+      return false;
     }
 
-    const open = await this.sessions.findOpenByTable(tableId, tx);
-    if (!open) {
-      throw new BadRequestException('Buka sesi meja terlebih dahulu');
-    }
-    return toSessionView(open);
+    this.realtime.emitSessionClosed(outletId, {
+      sessionId,
+      tableId: closed.tableId,
+    });
+    this.realtime.emitTableUpdated(outletId, {
+      tableId: closed.tableId,
+      status: TableStatus.AVAILABLE,
+    });
+    return true;
+  }
+
+  private errorText(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   async closeSession(

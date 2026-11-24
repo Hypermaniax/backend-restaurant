@@ -10,6 +10,8 @@ import {
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
 import type { RealtimeService } from '../realtime/realtime.service';
+import type { TableSessionService } from '../tables/table-session.service';
+import type { OrderReceiptService } from './order-receipt.service';
 import type { AuthUser } from '../security/types/auth-user';
 import { OrderLifecycleService } from './order-lifecycle.service';
 import type { OrderRecord, OrderRepository } from './order.repository';
@@ -85,13 +87,17 @@ function buildService() {
     emitQueueUpdated: jest.fn(),
     emitOrderCancelled: jest.fn(),
   };
+  const sessions = { closeIfIdle: jest.fn() };
+  const receipts = { sendForOrder: jest.fn() };
   const service = new OrderLifecycleService(
     prisma as unknown as PrismaService,
     orders as unknown as OrderRepository,
     audit as unknown as AuditService,
     realtime as unknown as RealtimeService,
+    sessions as unknown as TableSessionService,
+    receipts as unknown as OrderReceiptService,
   );
-  return { service, prisma, orders, audit, realtime };
+  return { service, prisma, orders, audit, realtime, sessions, receipts };
 }
 
 describe('OrderLifecycleService', () => {
@@ -139,6 +145,23 @@ describe('OrderLifecycleService', () => {
     expect(realtime.emitOrderPaid).toHaveBeenCalled();
     expect(realtime.emitQueueUpdated).toHaveBeenCalled();
     expect(result.status).toBe(OrderStatus.PAID);
+  });
+
+  it('auto-closes an idle table session after cancelling the last order', async () => {
+    const { service, orders, sessions } = buildService();
+    orders.findById.mockResolvedValueOnce(orderRecord()).mockResolvedValueOnce(
+      orderRecord({
+        status: OrderStatus.CANCELLED,
+        cancelReason: 'Customer membatalkan',
+      }),
+    );
+    orders.transition.mockResolvedValue(true);
+
+    await service.cancelOrder('outlet-1', 'order-1', actor, {
+      reason: 'Customer membatalkan',
+    });
+
+    expect(sessions.closeIfIdle).toHaveBeenCalledWith('outlet-1', 'session-1');
   });
 
   it('rejects cancelling a paid order', async () => {

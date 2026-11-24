@@ -7,6 +7,7 @@ import {
   IsArray,
   IsEnum,
   IsIn,
+  IsEmail,
   IsInt,
   IsOptional,
   IsString,
@@ -28,6 +29,11 @@ import { PaginationQueryDto } from '../../../common/pagination/pagination.dto';
 
 const trimString = (value: unknown): unknown =>
   typeof value === 'string' ? value.trim() : value;
+
+const trimOptionalString = (value: unknown): unknown => {
+  const trimmed = trimString(value);
+  return trimmed === '' ? null : trimmed;
+};
 
 export class OrderItemInputDto {
   @ApiProperty({ example: '00000000-0000-0000-0000-000000000000' })
@@ -81,6 +87,13 @@ export class CreatePublicOrderDto extends PublicOrderQuoteDto {
   @MaxLength(80)
   customerName?: string | null;
 
+  @ApiPropertyOptional({ nullable: true, maxLength: 254 })
+  @IsOptional()
+  @Transform(({ value }) => trimOptionalString(value))
+  @IsEmail()
+  @MaxLength(254)
+  customerEmail?: string | null;
+
   @ApiPropertyOptional({ nullable: true, maxLength: 500 })
   @IsOptional()
   @Transform(({ value }) => trimString(value))
@@ -117,6 +130,13 @@ export class CreateCashierOrderDto extends CashierOrderQuoteDto {
   @IsString()
   @MaxLength(80)
   customerName?: string | null;
+
+  @ApiPropertyOptional({ nullable: true, maxLength: 254 })
+  @IsOptional()
+  @Transform(({ value }) => trimOptionalString(value))
+  @IsEmail()
+  @MaxLength(254)
+  customerEmail?: string | null;
 
   @ApiPropertyOptional({ nullable: true, maxLength: 500 })
   @IsOptional()

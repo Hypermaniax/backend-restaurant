@@ -8,6 +8,7 @@ import {
 import type { PrismaService } from '../../prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
 import type { RealtimeService } from '../realtime/realtime.service';
+import type { TableSessionService } from '../tables/table-session.service';
 import type { AuthUser } from '../security/types/auth-user';
 import { OrderFulfillmentService } from './order-fulfillment.service';
 import type { OrderRecord, OrderRepository } from './order.repository';
@@ -79,13 +80,15 @@ function buildService() {
     emitOrderStatusChanged: jest.fn(),
     emitQueueUpdated: jest.fn(),
   };
+  const sessions = { closeIfIdle: jest.fn() };
   const service = new OrderFulfillmentService(
     prisma as unknown as PrismaService,
     orders as unknown as OrderRepository,
     audit as unknown as AuditService,
     realtime as unknown as RealtimeService,
+    sessions as unknown as TableSessionService,
   );
-  return { service, orders, audit, realtime };
+  return { service, orders, audit, realtime, sessions };
 }
 
 describe('OrderFulfillmentService', () => {
@@ -134,6 +137,28 @@ describe('OrderFulfillmentService', () => {
         status: OrderStatus.PREPARING,
       },
     });
+  });
+
+  it('auto-closes an idle table session after the last order is served', async () => {
+    const { service, orders, sessions } = buildService();
+    orders.findById
+      .mockResolvedValueOnce(orderRecord({ status: OrderStatus.READY }))
+      .mockResolvedValueOnce(
+        orderRecord({
+          status: OrderStatus.SERVED,
+          servedAt: new Date('2026-11-22T00:20:00.000Z'),
+        }),
+      );
+    orders.transition.mockResolvedValue(true);
+
+    await service.updateKdsStatus(
+      'outlet-1',
+      'order-1',
+      actor,
+      OrderStatus.SERVED,
+    );
+
+    expect(sessions.closeIfIdle).toHaveBeenCalledWith('outlet-1', 'session-1');
   });
 });
 

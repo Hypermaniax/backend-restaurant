@@ -10,6 +10,7 @@ import type { PrismaService } from '../../prisma/prisma.service';
 import type { AuditService } from '../audit/audit.service';
 import type { SettingsService } from '../settings/settings.service';
 import type { TableSessionService } from '../tables/table-session.service';
+import type { OrderReceiptService } from './order-receipt.service';
 import type { RealtimeService } from '../realtime/realtime.service';
 import type { AuthUser } from '../security/types/auth-user';
 import type { OrderRecord, OrderRepository } from './order.repository';
@@ -127,7 +128,7 @@ function buildService() {
     getTaxRules: jest.fn(),
   };
   const sessions = {
-    requireSessionForOrder: jest.fn(),
+    ensureSessionForOrder: jest.fn(),
   };
   const audit = {
     record: jest.fn(),
@@ -140,6 +141,7 @@ function buildService() {
     emitQueueUpdated: jest.fn(),
   };
 
+  const receipts = { sendForOrder: jest.fn() };
   const service = new CashierOrderCreationService(
     prisma as unknown as PrismaService,
     orders as unknown as OrderRepository,
@@ -148,6 +150,7 @@ function buildService() {
     sessions as unknown as TableSessionService,
     audit as unknown as AuditService,
     realtime as unknown as RealtimeService,
+    receipts as unknown as OrderReceiptService,
   );
 
   return {
@@ -159,6 +162,7 @@ function buildService() {
     sessions,
     audit,
     realtime,
+    receipts,
   };
 }
 
@@ -229,7 +233,7 @@ describe('CashierOrderCreationService', () => {
       }),
       expect.anything(),
     );
-    expect(sessions.requireSessionForOrder).not.toHaveBeenCalled();
+    expect(sessions.ensureSessionForOrder).not.toHaveBeenCalled();
     expect(orders.createPayment).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: 'CASHIER',

@@ -12,6 +12,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
 import { RealtimeService } from '../realtime/realtime.service';
+import { TableSessionService } from '../tables/table-session.service';
 import type { AuthUser } from '../security/types/auth-user';
 import { toAuditOrder } from './order.mapper';
 import { OrderRepository, type OrderRecord } from './order.repository';
@@ -25,6 +26,7 @@ export class OrderFulfillmentService {
     private readonly orders: OrderRepository,
     private readonly audit: AuditService,
     private readonly realtime: RealtimeService,
+    private readonly sessions: TableSessionService,
   ) {}
 
   async updateKdsStatus(
@@ -109,6 +111,10 @@ export class OrderFulfillmentService {
       }
       return saved;
     });
+
+    if (targetStatus === OrderStatus.SERVED && order.sessionId) {
+      await this.sessions.closeIfIdle(outletId, order.sessionId);
+    }
 
     const kdsOrder = toKdsOrderView(order);
     this.realtime.emitOrderStatusChanged(outletId, {
