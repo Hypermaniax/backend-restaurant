@@ -1,0 +1,459 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  ADMIN
+  CASHIER
+  KITCHEN
+}
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+}
+
+enum TableSessionStatus {
+  OPEN
+  CLOSED
+}
+
+enum SelectionType {
+  SINGLE
+  MULTIPLE
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
+enum OrderSource {
+  CUSTOMER_QR
+  CASHIER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  AWAITING_CASH
+  PAID
+  PREPARING
+  READY
+  SERVED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  EXPIRED
+}
+
+enum PaymentProvider {
+  XENDIT
+  CASHIER
+}
+
+enum PaymentMethod {
+  QRIS
+  CASH
+  EDC
+}
+
+enum OrderStatusSource {
+  CUSTOMER
+  CASHIER
+  KITCHEN
+  ADMIN
+  SYSTEM
+}
+
+enum CounterType {
+  ORDER
+  QUEUE
+}
+
+enum WebhookStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+model Outlet {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  slug       String   @unique
+  timezone   String   @default("Asia/Jakarta")
+  address    String?
+  phone      String?
+  logoUrl    String?  @map("logo_url")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  users             User[]
+  diningTables      DiningTable[]
+  categories        Category[]
+  menuItems         MenuItem[]
+  modifierGroups    ModifierGroup[]
+  orders            Order[]
+  taxRules          TaxRule[]
+  settings          Settings?
+  dailyCounters     DailyCounter[]
+  auditLogs         AuditLog[]
+
+  @@map("outlets")
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  outletId     String    @map("outlet_id") @db.Uuid
+  name         String
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  role         UserRole
+  isActive     Boolean   @default(true) @map("is_active")
+  lastLoginAt  DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  outlet         Outlet          @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  createdOrders  Order[]         @relation("OrderCreatedBy")
+  cancelledOrders Order[]        @relation("OrderCancelledBy")
+  closedSessions TableSession[]  @relation("SessionClosedBy")
+  statusLogs     OrderStatusLog[] @relation("OrderStatusActor")
+  auditLogs      AuditLog[]      @relation("AuditActor")
+
+  @@index([outletId])
+  @@map("users")
+}
+
+model DiningTable {
+  id        String      @id @default(uuid()) @db.Uuid
+  outletId  String      @map("outlet_id") @db.Uuid
+  code      String
+  name      String
+  zone      String?
+  status    TableStatus @default(AVAILABLE)
+  isActive  Boolean     @default(true) @map("is_active")
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  outlet   Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  sessions TableSession[]
+  orders   Order[]
+
+  @@unique([outletId, code])
+  @@index([outletId])
+  @@map("dining_tables")
+}
+
+model TableSession {
+  id             String             @id @default(uuid()) @db.Uuid
+  tableId        String             @map("table_id") @db.Uuid
+  status         TableSessionStatus @default(OPEN)
+  guestCount     Int?               @map("guest_count")
+  openedAt       DateTime           @default(now()) @map("opened_at") @db.Timestamptz(6)
+  closedAt       DateTime?          @map("closed_at") @db.Timestamptz(6)
+  closedByUserId String?            @map("closed_by_user_id") @db.Uuid
+
+  table    DiningTable @relation(fields: [tableId], references: [id], onDelete: Restrict)
+  closedBy User?       @relation("SessionClosedBy", fields: [closedByUserId], references: [id], onDelete: SetNull)
+  orders   Order[]
+
+  @@index([tableId])
+  @@map("table_sessions")
+}
+
+model Category {
+  id        String  @id @default(uuid()) @db.Uuid
+  outletId  String  @map("outlet_id") @db.Uuid
+  name      String
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  outlet    Outlet     @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  menuItems MenuItem[]
+
+  @@index([outletId])
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  outletId    String   @map("outlet_id") @db.Uuid
+  categoryId  String   @map("category_id") @db.Uuid
+  name        String
+  description String?
+  price       Int
+  imageUrl    String?  @map("image_url")
+  isAvailable Boolean  @default(true) @map("is_available")
+  isActive    Boolean  @default(true) @map("is_active")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  outlet         Outlet                  @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  category       Category                @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  modifierGroups MenuItemModifierGroup[]
+  orderItems     OrderItem[]
+
+  @@index([outletId])
+  @@index([categoryId])
+  @@map("menu_items")
+}
+
+model ModifierGroup {
+  id            String        @id @default(uuid()) @db.Uuid
+  outletId      String        @map("outlet_id") @db.Uuid
+  name          String
+  selectionType SelectionType @map("selection_type")
+  minSelect     Int           @default(0) @map("min_select")
+  maxSelect     Int?          @map("max_select")
+  isRequired    Boolean       @default(false) @map("is_required")
+  isActive      Boolean       @default(true) @map("is_active")
+  sortOrder     Int           @default(0) @map("sort_order")
+
+  outlet    Outlet                  @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  options   ModifierOption[]
+  menuItems MenuItemModifierGroup[]
+
+  @@index([outletId])
+  @@map("modifier_groups")
+}
+
+model ModifierOption {
+  id         String  @id @default(uuid()) @db.Uuid
+  groupId    String  @map("group_id") @db.Uuid
+  name       String
+  priceDelta Int     @default(0) @map("price_delta")
+  isDefault  Boolean @default(false) @map("is_default")
+  isActive   Boolean @default(true) @map("is_active")
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  group              ModifierGroup        @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  orderItemModifiers OrderItemModifier[]
+
+  @@index([groupId])
+  @@map("modifier_options")
+}
+
+model MenuItemModifierGroup {
+  menuItemId String @map("menu_item_id") @db.Uuid
+  groupId    String @map("group_id") @db.Uuid
+
+  menuItem MenuItem      @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  group    ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Restrict)
+
+  @@id([menuItemId, groupId])
+  @@map("menu_item_modifier_groups")
+}
+
+model Order {
+  id                     String        @id @default(uuid()) @db.Uuid
+  outletId               String        @map("outlet_id") @db.Uuid
+  orderType              OrderType     @map("order_type")
+  source                 OrderSource
+  createdByUserId        String?       @map("created_by_user_id") @db.Uuid
+  tableId                String?       @map("table_id") @db.Uuid
+  sessionId              String?       @map("session_id") @db.Uuid
+  orderNumber            String        @map("order_number")
+  idempotencyKey         String?       @map("idempotency_key")
+  businessDate           DateTime      @map("business_date") @db.Date
+  queueNumber            Int?          @map("queue_number")
+  queueAssignedAt        DateTime?     @map("queue_assigned_at") @db.Timestamptz(6)
+  status                 OrderStatus
+  paymentStatus          PaymentStatus @default(PENDING) @map("payment_status")
+  subtotal               Int
+  taxAmount              Int           @map("tax_amount")
+  serviceAmount          Int           @map("service_amount")
+  discountAmount         Int           @default(0) @map("discount_amount")
+  total                  Int
+  currency               String        @default("IDR")
+  customerName           String?       @map("customer_name")
+  notes                  String?
+  taxRateBp              Int           @map("tax_rate_bp")
+  taxInclusive           Boolean       @map("tax_inclusive")
+  taxBaseIncludesService Boolean       @map("tax_base_includes_service")
+  serviceRateBp          Int           @map("service_rate_bp")
+  expiresAt              DateTime      @map("expires_at") @db.Timestamptz(6)
+  paidAt                 DateTime?     @map("paid_at") @db.Timestamptz(6)
+  preparingAt            DateTime?     @map("preparing_at") @db.Timestamptz(6)
+  readyAt                DateTime?     @map("ready_at") @db.Timestamptz(6)
+  servedAt               DateTime?     @map("served_at") @db.Timestamptz(6)
+  cancelledAt            DateTime?     @map("cancelled_at") @db.Timestamptz(6)
+  cancelledByUserId      String?       @map("cancelled_by_user_id") @db.Uuid
+  cancelReason           String?       @map("cancel_reason")
+  createdAt              DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  outlet      Outlet       @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  createdBy   User?        @relation("OrderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  cancelledBy User?        @relation("OrderCancelledBy", fields: [cancelledByUserId], references: [id], onDelete: SetNull)
+  table       DiningTable? @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  session     TableSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  items       OrderItem[]
+  payments    Payment[]
+  statusLogs  OrderStatusLog[]
+
+  @@unique([outletId, orderNumber])
+  @@unique([outletId, idempotencyKey])
+  @@unique([outletId, businessDate, queueNumber])
+  @@index([outletId, orderType, status, createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(uuid()) @db.Uuid
+  orderId      String  @map("order_id") @db.Uuid
+  menuItemId   String? @map("menu_item_id") @db.Uuid
+  nameSnapshot String  @map("name_snapshot")
+  unitPrice    Int     @map("unit_price")
+  qty          Int
+  notes        String?
+  lineTotal    Int     @map("line_total")
+
+  order          Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem       MenuItem?           @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  modifiers      OrderItemModifier[]
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+model OrderItemModifier {
+  id               String @id @default(uuid()) @db.Uuid
+  orderItemId      String @map("order_item_id") @db.Uuid
+  modifierOptionId String? @map("modifier_option_id") @db.Uuid
+  nameSnapshot     String @map("name_snapshot")
+  priceDelta       Int    @map("price_delta")
+  qty              Int    @default(1)
+
+  orderItem      OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  modifierOption ModifierOption? @relation(fields: [modifierOptionId], references: [id], onDelete: SetNull)
+
+  @@index([orderItemId])
+  @@map("order_item_modifiers")
+}
+
+model Payment {
+  id                String          @id @default(uuid()) @db.Uuid
+  orderId           String          @map("order_id") @db.Uuid
+  provider          PaymentProvider
+  method            PaymentMethod
+  status            PaymentStatus
+  amount            Int
+  referenceId       String          @unique @map("reference_id")
+  providerPaymentId String?         @map("provider_payment_id")
+  qrString          String?         @map("qr_string")
+  expiresAt         DateTime?       @map("expires_at") @db.Timestamptz(6)
+  paidAt            DateTime?       @map("paid_at") @db.Timestamptz(6)
+  rawResponse       Json?           @map("raw_response") @db.JsonB
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([providerPaymentId])
+  @@map("payments")
+}
+
+model OrderStatusLog {
+  id          String            @id @default(uuid()) @db.Uuid
+  orderId     String            @map("order_id") @db.Uuid
+  fromStatus  String?           @map("from_status")
+  toStatus    String            @map("to_status")
+  actorUserId String?           @map("actor_user_id") @db.Uuid
+  source      OrderStatusSource
+  note        String?
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actor User? @relation("OrderStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@map("order_status_logs")
+}
+
+model TaxRule {
+  id        String    @id @default(uuid()) @db.Uuid
+  outletId  String    @map("outlet_id") @db.Uuid
+  orderType OrderType @map("order_type")
+  isEnabled Boolean   @default(true) @map("is_enabled")
+  rateBp    Int       @map("rate_bp")
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Restrict)
+
+  @@unique([outletId, orderType])
+  @@map("tax_rules")
+}
+
+model WebhookEvent {
+  id          String        @id @default(uuid()) @db.Uuid
+  provider    String
+  externalId  String        @map("external_id")
+  eventType   String        @map("event_type")
+  payload     Json          @db.JsonB
+  status      WebhookStatus @default(RECEIVED)
+  receivedAt  DateTime      @default(now()) @map("received_at") @db.Timestamptz(6)
+  processedAt DateTime?     @map("processed_at") @db.Timestamptz(6)
+
+  @@unique([provider, externalId])
+  @@map("webhook_events")
+}
+
+model Settings {
+  id                          String   @id @default(uuid()) @db.Uuid
+  outletId                    String   @unique @map("outlet_id") @db.Uuid
+  taxInclusive                Boolean  @map("tax_inclusive")
+  taxBaseIncludesService      Boolean  @map("tax_base_includes_service")
+  serviceRateBp               Int      @map("service_rate_bp")
+  requirePaymentBeforeKitchen Boolean  @default(true) @map("require_payment_before_kitchen")
+  orderExpiryMinutes          Int      @default(15) @map("order_expiry_minutes")
+  cashExpiryMinutes           Int      @default(30) @map("cash_expiry_minutes")
+  receiptFooter               String?  @map("receipt_footer")
+  updatedAt                   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Restrict)
+
+  @@map("settings")
+}
+
+model DailyCounter {
+  outletId    String      @map("outlet_id") @db.Uuid
+  counterDate DateTime    @map("counter_date") @db.Date
+  counterType CounterType @map("counter_type")
+  lastNumber  Int         @default(0) @map("last_number")
+
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Restrict)
+
+  @@id([outletId, counterDate, counterType])
+  @@map("daily_counters")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  outletId    String   @map("outlet_id") @db.Uuid
+  actorUserId String?  @map("actor_user_id") @db.Uuid
+  action      String
+  entityType  String   @map("entity_type")
+  entityId    String   @map("entity_id")
+  before      Json?    @db.JsonB
+  after       Json?    @db.JsonB
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  outlet Outlet @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  actor  User?  @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([outletId, createdAt])
+  @@map("audit_logs")
+}

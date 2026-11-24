@@ -1,0 +1,13 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, MinLength } from 'class-validator';
+
+export class RefreshTokenDto {
+  @ApiPropertyOptional({
+    description:
+      'Refresh token dari response login. Opsional untuk web karena browser memakai cookie httpOnly.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(20)
+  refreshToken?: string;
+}
