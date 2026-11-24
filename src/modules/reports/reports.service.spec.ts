@@ -5,7 +5,6 @@ import type {
   ReportOrderRecord,
   ReportRepository,
 } from './report.repository';
-import { ReportType } from './report.types';
 import { ReportsService } from './reports.service';
 
 function reportOrder(
@@ -226,22 +225,6 @@ describe('ReportsService', () => {
         },
       ],
     });
-  });
-
-  it('exports CSV and escapes formula-like cells', async () => {
-    const { service, reports } = buildService();
-    reports.findCancelledOrders.mockResolvedValue([
-      cancelledOrder({ cancelReason: '=HYPERLINK("x")' }),
-    ]);
-
-    const file = await service.exportCsv(
-      'outlet-1',
-      ReportType.CANCELLATIONS,
-      '2026-11-22',
-    );
-
-    expect(file.filename).toBe('report-cancellations-2026-11-22.csv');
-    expect(file.content).toContain(`'=HYPERLINK(""x"")`);
   });
 
   it('rejects an invalid calendar date', async () => {

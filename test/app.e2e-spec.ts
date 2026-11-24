@@ -8,7 +8,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
 import { PrismaService } from './../src/prisma/prisma.service';
-import { OrdersService } from './../src/modules/orders/orders.service';
+import { OrderExpiryService } from './../src/modules/orders/order-expiry.service';
 import type { PaymentGateway } from './../src/modules/payments/payment.types';
 import { PAYMENT_GATEWAY } from './../src/modules/payments/xendit-payment.provider';
 
@@ -695,7 +695,7 @@ describe('Health (e2e)', () => {
       throw new Error('Menu seed Air Mineral tidak ditemukan');
     }
 
-    const ordersService = app.get(OrdersService);
+    const orderExpiry = app.get(OrderExpiryService);
     const orderIds = new Set<string>();
     let tableId = '';
 
@@ -891,7 +891,7 @@ describe('Health (e2e)', () => {
         where: { id: expiredOrder.id },
         data: { expiresAt: new Date(Date.now() - 60_000) },
       });
-      await ordersService.expireStaleOrders(new Date());
+      await orderExpiry.expireStaleOrders(new Date());
       const storedExpired = await prisma.order.findUnique({
         where: { id: expiredOrder.id },
       });

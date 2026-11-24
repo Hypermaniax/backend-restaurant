@@ -16,6 +16,7 @@ import { RolesGuard } from '../security/guards/roles.guard';
 import { MESSAGES, withMessage } from '../../common/response';
 import type { AuthUser } from '../security/types/auth-user';
 import { OpenTableSessionDto } from './dto/table.dto';
+import { TableSessionService } from './table-session.service';
 import { TablesService } from './tables.service';
 
 @ApiTags('cashier-tables')
@@ -24,7 +25,10 @@ import { TablesService } from './tables.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.CASHIER, UserRole.ADMIN)
 export class CashierTablesController {
-  constructor(private readonly tables: TablesService) {}
+  constructor(
+    private readonly tables: TablesService,
+    private readonly sessions: TableSessionService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Daftar meja untuk filter order kasir' })
@@ -39,7 +43,7 @@ export class CashierTablesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: OpenTableSessionDto,
   ) {
-    const session = await this.tables.openSession(user.outletId, id, dto);
+    const session = await this.sessions.openSession(user.outletId, id, dto);
     return withMessage(session, MESSAGES.tables.sessionOpened);
   }
 
@@ -49,7 +53,7 @@ export class CashierTablesController {
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const session = await this.tables.closeSession(
+    const session = await this.sessions.closeSession(
       user.outletId,
       id,
       user.userId,

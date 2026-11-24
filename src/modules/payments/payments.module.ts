@@ -5,6 +5,8 @@ import { SecurityModule } from '../security/security.module';
 import { CashierPaymentsController } from './cashier-payments.controller';
 import { PaymentRepository } from './payment.repository';
 import { PaymentsService } from './payments.service';
+import { XenditEventProcessorService } from './xendit-event-processor.service';
+import { XenditWebhookService } from './xendit-webhook.service';
 import { PublicPaymentsController } from './public-payments.controller';
 import { XenditWebhookController } from './xendit-webhook.controller';
 import {
@@ -22,12 +24,14 @@ import {
   providers: [
     PaymentRepository,
     PaymentsService,
+    XenditEventProcessorService,
+    XenditWebhookService,
     XenditPaymentProvider,
     {
       provide: PAYMENT_GATEWAY,
       useExisting: XenditPaymentProvider,
     },
   ],
-  exports: [PaymentsService],
+  exports: [PaymentsService, XenditEventProcessorService, XenditWebhookService],
 })
 export class PaymentsModule {}

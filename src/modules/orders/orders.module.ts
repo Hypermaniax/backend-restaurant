@@ -5,9 +5,16 @@ import { SettingsModule } from '../settings/settings.module';
 import { TablesModule } from '../tables/tables.module';
 import { CashierDashboardController } from './cashier-dashboard.controller';
 import { CashierOrdersController } from './cashier-orders.controller';
+import { CashierOrderCreationService } from './cashier-order-creation.service';
+import { OrderQuoteService } from './order-quote.service';
 import { OrderExpiryScheduler } from './order-expiry.scheduler';
+import { OrderExpiryService } from './order-expiry.service';
+import { OrderPaymentStateService } from './order-payment-state.service';
+import { OrderQueryService } from './order-query.service';
 import { OrderRepository } from './order.repository';
-import { OrdersService } from './orders.service';
+import { PublicOrderCreationService } from './public-order-creation.service';
+import { OrderFulfillmentService } from './order-fulfillment.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { PricingService } from './pricing.service';
 import { PublicOrdersController } from './public-orders.controller';
 
@@ -21,9 +28,25 @@ import { PublicOrdersController } from './public-orders.controller';
   providers: [
     OrderRepository,
     PricingService,
-    OrdersService,
+    OrderQuoteService,
+    PublicOrderCreationService,
+    CashierOrderCreationService,
+    OrderLifecycleService,
+    OrderFulfillmentService,
+    OrderQueryService,
+    OrderPaymentStateService,
+    OrderExpiryService,
     OrderExpiryScheduler,
   ],
-  exports: [OrdersService],
+  exports: [
+    OrderQuoteService,
+    PublicOrderCreationService,
+    CashierOrderCreationService,
+    OrderLifecycleService,
+    OrderFulfillmentService,
+    OrderQueryService,
+    OrderPaymentStateService,
+    OrderExpiryService,
+  ],
 })
 export class OrdersModule {}

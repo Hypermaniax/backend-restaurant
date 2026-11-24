@@ -30,7 +30,10 @@ import {
   CreateCashierOrderDto,
   OrderListQueryDto,
 } from './dto/order.dto';
-import { OrdersService } from './orders.service';
+import { CashierOrderCreationService } from './cashier-order-creation.service';
+import { OrderQuoteService } from './order-quote.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 
 @ApiTags('cashier-orders')
 @ApiBearerAuth()
@@ -38,25 +41,30 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.CASHIER, UserRole.ADMIN)
 export class CashierOrdersController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly lifecycle: OrderLifecycleService,
+    private readonly quoteService: OrderQuoteService,
+    private readonly creation: CashierOrderCreationService,
+    private readonly query: OrderQueryService,
+  ) {}
 
   @Post('quote')
   @HttpCode(200)
   @ApiOperation({ summary: 'Hitung ulang total order kasir' })
   quote(@CurrentUser() user: AuthUser, @Body() dto: CashierOrderQuoteDto) {
-    return this.orders.quoteCashier(user.outletId, dto);
+    return this.quoteService.quoteCashier(user.outletId, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Daftar order kasir dengan filter' })
   list(@CurrentUser() user: AuthUser, @Query() query: OrderListQueryDto) {
-    return this.orders.listCashier(user.outletId, query);
+    return this.query.listCashier(user.outletId, query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Detail order kasir' })
   get(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.orders.getCashierOrder(user.outletId, id);
+    return this.query.getCashierOrder(user.outletId, id);
   }
 
   @Post()
@@ -73,7 +81,7 @@ export class CashierOrdersController {
     @Body() dto: CreateCashierOrderDto,
     @Headers('idempotency-key') idempotencyKey?: string,
   ) {
-    const order = await this.orders.createCashierOrder(
+    const order = await this.creation.createCashierOrder(
       user.outletId,
       user,
       dto,
@@ -92,7 +100,7 @@ export class CashierOrdersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: ConfirmOrderPaymentDto,
   ) {
-    const order = await this.orders.confirmPayment(
+    const order = await this.lifecycle.confirmPayment(
       user.outletId,
       id,
       user,
@@ -109,7 +117,12 @@ export class CashierOrdersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CancelOrderDto,
   ) {
-    const order = await this.orders.cancelOrder(user.outletId, id, user, dto);
+    const order = await this.lifecycle.cancelOrder(
+      user.outletId,
+      id,
+      user,
+      dto,
+    );
     return withMessage(order, MESSAGES.orders.cancelled);
   }
 }

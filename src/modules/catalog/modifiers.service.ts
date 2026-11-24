@@ -9,10 +9,6 @@ import {
   type PageResult,
 } from '../../common/pagination/pagination.dto';
 import type {
-  ModifierOption,
-  SelectionType,
-} from '../../generated/prisma/client';
-import type {
   ModifierGroupView,
   ModifierGroupWithOptions,
   ModifierOptionView,
@@ -24,7 +20,9 @@ import type {
   UpdateModifierGroupDto,
   UpdateModifierOptionDto,
 } from './dto/modifier.dto';
+import { toModifierGroupView, toModifierOptionView } from './modifier.mapper';
 import { ModifierRepository } from './modifier.repository';
+import { normalizeMaxSelect, validateSelection } from './modifier-selection';
 
 @Injectable()
 export class ModifiersService {
@@ -42,7 +40,7 @@ export class ModifiersService {
       query,
     );
     return createPageResult(
-      items.map((group) => this.toView(group)),
+      items.map((group) => toModifierGroupView(group)),
       total,
       pagination,
     );
@@ -53,13 +51,13 @@ export class ModifiersService {
     dto: CreateModifierGroupDto,
   ): Promise<ModifierGroupView> {
     const minSelect = dto.minSelect ?? (dto.isRequired ? 1 : 0);
-    const maxSelect = this.normalizeMaxSelect(
+    const maxSelect = normalizeMaxSelect(
       dto.selectionType,
       minSelect,
       dto.maxSelect,
     );
 
-    this.validateSelection(
+    validateSelection(
       dto.selectionType,
       minSelect,
       maxSelect,
@@ -77,7 +75,7 @@ export class ModifiersService {
       sortOrder: dto.sortOrder ?? 0,
     });
 
-    return this.toView({ ...group, options: [] });
+    return toModifierGroupView({ ...group, options: [] });
   }
 
   async updateGroup(
@@ -89,13 +87,13 @@ export class ModifiersService {
     const selectionType = dto.selectionType ?? current.selectionType;
     const minSelect = dto.minSelect ?? current.minSelect;
     const isRequired = dto.isRequired ?? current.isRequired;
-    const maxSelect = this.normalizeMaxSelect(
+    const maxSelect = normalizeMaxSelect(
       selectionType,
       minSelect,
       dto.maxSelect === undefined ? current.maxSelect : dto.maxSelect,
     );
 
-    this.validateSelection(selectionType, minSelect, maxSelect, isRequired);
+    validateSelection(selectionType, minSelect, maxSelect, isRequired);
 
     const updated = await this.modifiers.updateGroup(outletId, groupId, {
       ...(dto.name === undefined ? {} : { name: dto.name }),
@@ -113,7 +111,7 @@ export class ModifiersService {
       throw new NotFoundException('Grup modifier tidak ditemukan');
     }
 
-    return this.toView(updated);
+    return toModifierGroupView(updated);
   }
 
   async softDeleteGroup(
@@ -126,7 +124,7 @@ export class ModifiersService {
     if (!updated) {
       throw new NotFoundException('Grup modifier tidak ditemukan');
     }
-    return this.toView(updated);
+    return toModifierGroupView(updated);
   }
 
   async createOption(
@@ -148,7 +146,7 @@ export class ModifiersService {
       sortOrder: dto.sortOrder ?? 0,
     });
 
-    return this.toOptionView(option);
+    return toModifierOptionView(option);
   }
 
   async updateOption(
@@ -168,7 +166,7 @@ export class ModifiersService {
       throw new NotFoundException('Opsi modifier tidak ditemukan');
     }
 
-    return this.toOptionView(updated);
+    return toModifierOptionView(updated);
   }
 
   async softDeleteOption(
@@ -182,7 +180,7 @@ export class ModifiersService {
       throw new NotFoundException('Opsi modifier tidak ditemukan');
     }
 
-    return this.toOptionView(updated);
+    return toModifierOptionView(updated);
   }
 
   private async requireGroup(
@@ -194,90 +192,5 @@ export class ModifiersService {
       throw new NotFoundException('Grup modifier tidak ditemukan');
     }
     return group;
-  }
-
-  private normalizeMaxSelect(
-    selectionType: SelectionType,
-    minSelect: number,
-    maxSelect: number | null | undefined,
-  ): number | null {
-    if (selectionType === 'SINGLE') {
-      return 1;
-    }
-
-    if (maxSelect === undefined || maxSelect === null) {
-      return null;
-    }
-
-    if (maxSelect < minSelect) {
-      throw new BadRequestException(
-        'maxSelect tidak boleh lebih kecil dari minSelect',
-      );
-    }
-
-    return maxSelect;
-  }
-
-  private validateSelection(
-    selectionType: SelectionType,
-    minSelect: number,
-    maxSelect: number | null,
-    isRequired: boolean,
-  ): void {
-    if (selectionType === 'SINGLE') {
-      if (minSelect > 1) {
-        throw new BadRequestException('minSelect untuk SINGLE maksimal 1');
-      }
-      if (isRequired && minSelect < 1) {
-        throw new BadRequestException(
-          'Grup wajib harus memiliki minSelect minimal 1',
-        );
-      }
-      return;
-    }
-
-    if (isRequired && minSelect < 1) {
-      throw new BadRequestException(
-        'Grup wajib harus memiliki minSelect minimal 1',
-      );
-    }
-
-    if (maxSelect !== null && maxSelect < minSelect) {
-      throw new BadRequestException(
-        'maxSelect tidak boleh lebih kecil dari minSelect',
-      );
-    }
-  }
-
-  private toView(group: ModifierGroupWithOptions): ModifierGroupView {
-    return {
-      id: group.id,
-      outletId: group.outletId,
-      name: group.name,
-      selectionType: group.selectionType,
-      minSelect: group.minSelect,
-      maxSelect: group.maxSelect,
-      isRequired: group.isRequired,
-      isActive: group.isActive,
-      sortOrder: group.sortOrder,
-      options: group.options
-        .slice()
-        .sort(
-          (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-        )
-        .map((option) => this.toOptionView(option)),
-    };
-  }
-
-  private toOptionView(option: ModifierOption): ModifierOptionView {
-    return {
-      id: option.id,
-      groupId: option.groupId,
-      name: option.name,
-      priceDelta: option.priceDelta,
-      isDefault: option.isDefault,
-      isActive: option.isActive,
-      sortOrder: option.sortOrder,
-    };
   }
 }

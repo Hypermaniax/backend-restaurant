@@ -8,21 +8,17 @@ import {
   resolvePagination,
   type PageResult,
 } from '../../common/pagination/pagination.dto';
-import type { ModifierGroup } from '../../generated/prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { RealtimeService } from '../realtime/realtime.service';
 import { CategoryRepository } from './category.repository';
-import type {
-  MenuItemView,
-  MenuItemWithRelations,
-  ModifierGroupView,
-} from './catalog.types';
+import type { MenuItemView, MenuItemWithRelations } from './catalog.types';
 import type {
   CreateMenuItemDto,
   MenuItemListQueryDto,
   UpdateMenuItemDto,
 } from './dto/menu-item.dto';
 import { MenuImageService } from './menu-image.service';
+import { toMenuItemView } from './menu-item.mapper';
 import { MenuItemRepository } from './menu-item.repository';
 import { ModifierRepository } from './modifier.repository';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -55,14 +51,14 @@ export class MenuItemsService {
     );
 
     return createPageResult(
-      items.map((item) => this.toView(item)),
+      items.map((item) => toMenuItemView(item)),
       total,
       pagination,
     );
   }
 
   async get(outletId: string, menuItemId: string): Promise<MenuItemView> {
-    return this.toView(await this.requireItem(outletId, menuItemId));
+    return toMenuItemView(await this.requireItem(outletId, menuItemId));
   }
 
   async create(
@@ -100,7 +96,7 @@ export class MenuItemsService {
       return saved;
     });
 
-    const view = this.toView(item);
+    const view = toMenuItemView(item);
     this.emitMenuUpdated(view);
     return view;
   }
@@ -176,7 +172,7 @@ export class MenuItemsService {
       return saved;
     });
 
-    const view = this.toView(updated);
+    const view = toMenuItemView(updated);
     this.emitMenuUpdated(view);
     return view;
   }
@@ -212,7 +208,7 @@ export class MenuItemsService {
       return saved;
     });
 
-    const view = this.toView(updated);
+    const view = toMenuItemView(updated);
     this.emitMenuUpdated(view);
     return view;
   }
@@ -284,68 +280,5 @@ export class MenuItemsService {
     if (groups.some((group) => !group.isActive)) {
       throw new BadRequestException('Grup modifier nonaktif');
     }
-  }
-
-  private toView(item: MenuItemWithRelations): MenuItemView {
-    return {
-      id: item.id,
-      outletId: item.outletId,
-      categoryId: item.categoryId,
-      categoryName: item.category.name,
-      name: item.name,
-      description: item.description,
-      price: item.price,
-      imageUrl: item.imageUrl,
-      isAvailable: item.isAvailable,
-      isActive: item.isActive,
-      sortOrder: item.sortOrder,
-      modifierGroups: item.modifierGroups
-        .map((link) => this.toModifierGroupView(link.group))
-        .sort(
-          (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-        ),
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-    };
-  }
-
-  private toModifierGroupView(
-    group: ModifierGroup & {
-      options: Array<{
-        id: string;
-        groupId: string;
-        name: string;
-        priceDelta: number;
-        isDefault: boolean;
-        isActive: boolean;
-        sortOrder: number;
-      }>;
-    },
-  ): ModifierGroupView {
-    return {
-      id: group.id,
-      outletId: group.outletId,
-      name: group.name,
-      selectionType: group.selectionType,
-      minSelect: group.minSelect,
-      maxSelect: group.maxSelect,
-      isRequired: group.isRequired,
-      isActive: group.isActive,
-      sortOrder: group.sortOrder,
-      options: group.options
-        .slice()
-        .sort(
-          (a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name),
-        )
-        .map((option) => ({
-          id: option.id,
-          groupId: option.groupId,
-          name: option.name,
-          priceDelta: option.priceDelta,
-          isDefault: option.isDefault,
-          isActive: option.isActive,
-          sortOrder: option.sortOrder,
-        })),
-    };
   }
 }

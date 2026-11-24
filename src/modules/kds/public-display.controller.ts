@@ -1,13 +1,13 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
-import { OrdersService } from '../orders/orders.service';
+import { OrderQueryService } from '../orders/order-query.service';
 import { DisplayQueueQueryDto } from './dto/kds.dto';
 
 @ApiTags('public-display')
 @Controller('public/display')
 export class PublicDisplayController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(private readonly query: OrderQueryService) {}
 
   @Get('queue')
   @UseGuards(ThrottlerGuard)
@@ -16,6 +16,6 @@ export class PublicDisplayController {
     summary: 'Antrian publik tanpa PII untuk layar /display',
   })
   queue(@Query() query: DisplayQueueQueryDto) {
-    return this.orders.getDisplayQueue(query.outletId);
+    return this.query.getDisplayQueue(query.outletId);
   }
 }

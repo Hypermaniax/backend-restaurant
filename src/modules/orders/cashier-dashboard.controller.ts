@@ -6,7 +6,7 @@ import { Roles } from '../security/decorators/roles.decorator';
 import { JwtAuthGuard } from '../security/guards/jwt-auth.guard';
 import { RolesGuard } from '../security/guards/roles.guard';
 import type { AuthUser } from '../security/types/auth-user';
-import { OrdersService } from './orders.service';
+import { OrderQueryService } from './order-query.service';
 
 @ApiTags('cashier-orders')
 @ApiBearerAuth()
@@ -14,11 +14,11 @@ import { OrdersService } from './orders.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.CASHIER, UserRole.ADMIN)
 export class CashierDashboardController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(private readonly query: OrderQueryService) {}
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Ringkasan operasional kasir hari ini' })
   dashboard(@CurrentUser() user: AuthUser) {
-    return this.orders.dashboard(user.outletId);
+    return this.query.dashboard(user.outletId);
   }
 }

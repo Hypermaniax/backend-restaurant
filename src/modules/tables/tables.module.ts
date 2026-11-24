@@ -6,6 +6,7 @@ import { PublicTablesController } from './public-tables.controller';
 import { TableQrService } from './table-qr.service';
 import { TableRepository } from './table.repository';
 import { TableSessionRepository } from './table-session.repository';
+import { TableSessionService } from './table-session.service';
 import { TablesService } from './tables.service';
 
 @Module({
@@ -19,8 +20,9 @@ import { TablesService } from './tables.service';
     TableRepository,
     TableSessionRepository,
     TableQrService,
+    TableSessionService,
     TablesService,
   ],
-  exports: [TablesService],
+  exports: [TablesService, TableSessionService],
 })
 export class TablesModule {}

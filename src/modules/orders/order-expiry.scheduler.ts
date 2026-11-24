@@ -5,7 +5,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { OrdersService } from './orders.service';
+import { OrderExpiryService } from './order-expiry.service';
 
 @Injectable()
 export class OrderExpiryScheduler implements OnModuleInit, OnModuleDestroy {
@@ -13,7 +13,7 @@ export class OrderExpiryScheduler implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
 
   constructor(
-    private readonly orders: OrdersService,
+    private readonly expiry: OrderExpiryService,
     private readonly config: ConfigService,
   ) {}
 
@@ -23,7 +23,7 @@ export class OrderExpiryScheduler implements OnModuleInit, OnModuleDestroy {
     }
 
     this.timer = setInterval(() => {
-      void this.orders.expireStaleOrders().catch((error: unknown) => {
+      void this.expiry.expireStaleOrders().catch((error: unknown) => {
         this.logger.error('Gagal mengekspirasi order', error);
       });
     }, 60_000);

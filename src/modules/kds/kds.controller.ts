@@ -15,7 +15,8 @@ import { JwtAuthGuard } from '../security/guards/jwt-auth.guard';
 import { RolesGuard } from '../security/guards/roles.guard';
 import { MESSAGES, withMessage } from '../../common/response';
 import type { AuthUser } from '../security/types/auth-user';
-import { OrdersService } from '../orders/orders.service';
+import { OrderQueryService } from '../orders/order-query.service';
+import { OrderFulfillmentService } from '../orders/order-fulfillment.service';
 import { UpdateKdsStatusDto } from './dto/kds.dto';
 
 @ApiTags('kds')
@@ -24,12 +25,15 @@ import { UpdateKdsStatusDto } from './dto/kds.dto';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.KITCHEN, UserRole.ADMIN)
 export class KdsController {
-  constructor(private readonly orders: OrdersService) {}
+  constructor(
+    private readonly fulfillment: OrderFulfillmentService,
+    private readonly query: OrderQueryService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Antrian KDS order lunas yang belum selesai' })
   list(@CurrentUser() user: AuthUser) {
-    return this.orders.listKds(user.outletId);
+    return this.query.listKds(user.outletId);
   }
 
   @Patch(':id/status')
@@ -39,7 +43,7 @@ export class KdsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateKdsStatusDto,
   ) {
-    const order = await this.orders.updateKdsStatus(
+    const order = await this.fulfillment.updateKdsStatus(
       user.outletId,
       id,
       user,

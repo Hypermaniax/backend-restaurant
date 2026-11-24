@@ -1,7 +1,5 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import type { PrismaService } from '../../prisma/prisma.service';
 import type { TableQrService } from './table-qr.service';
-import type { TableSessionRepository } from './table-session.repository';
 import type { TableRepository } from './table.repository';
 import { TablesService } from './tables.service';
 import type { RealtimeService } from '../realtime/realtime.service';
@@ -29,19 +27,7 @@ const openSession = {
   closedByUserId: null,
 };
 
-const closedSession = {
-  ...openSession,
-  status: 'CLOSED' as const,
-  closedAt: new Date('2026-01-01T01:00:00.000Z'),
-  closedByUserId: 'cashier-1',
-};
-
 function buildService() {
-  const prisma = {
-    $transaction: jest.fn((callback: (tx: object) => unknown) =>
-      Promise.resolve(callback({})),
-    ),
-  };
   const tables = {
     listByOutlet: jest.fn(),
     listActiveByOutlet: jest.fn(),
@@ -50,12 +36,6 @@ function buildService() {
     create: jest.fn(),
     update: jest.fn(),
     updateStatus: jest.fn(),
-  };
-  const sessions = {
-    findOpenByTable: jest.fn(),
-    create: jest.fn(),
-    close: jest.fn(),
-    countBlockingOrders: jest.fn(),
   };
   const qr = {
     buildTableUrl: jest.fn(),
@@ -68,14 +48,12 @@ function buildService() {
   };
 
   const service = new TablesService(
-    prisma as unknown as PrismaService,
     tables as unknown as TableRepository,
-    sessions as unknown as TableSessionRepository,
     qr as unknown as TableQrService,
     realtime as unknown as RealtimeService,
   );
 
-  return { service, tables, sessions, qr, realtime };
+  return { service, tables, qr, realtime };
 }
 
 describe('TablesService', () => {
@@ -99,60 +77,6 @@ describe('TablesService', () => {
       total: 21,
       totalPages: 2,
     });
-  });
-
-  it('opens a session and marks the table occupied', async () => {
-    const { service, tables, sessions } = buildService();
-    tables.findById.mockResolvedValue(table);
-    sessions.findOpenByTable.mockResolvedValue(null);
-    sessions.create.mockResolvedValue(openSession);
-
-    const result = await service.openSession('outlet-1', 'table-1', {
-      guestCount: 2,
-    });
-
-    expect(result.id).toBe('session-1');
-    expect(tables.updateStatus).toHaveBeenCalledWith(
-      'outlet-1',
-      'table-1',
-      'OCCUPIED',
-      expect.anything(),
-    );
-  });
-
-  it('rejects closing a session with active orders', async () => {
-    const { service, tables, sessions } = buildService();
-    tables.findById.mockResolvedValue({ ...table, sessions: [openSession] });
-    sessions.findOpenByTable.mockResolvedValue(openSession);
-    sessions.countBlockingOrders.mockResolvedValue(1);
-
-    await expect(
-      service.closeSession('outlet-1', 'table-1', 'cashier-1'),
-    ).rejects.toThrow(BadRequestException);
-    expect(sessions.close).not.toHaveBeenCalled();
-    expect(tables.updateStatus).not.toHaveBeenCalled();
-  });
-
-  it('closes a session and marks the table available', async () => {
-    const { service, tables, sessions } = buildService();
-    tables.findById.mockResolvedValue({ ...table, sessions: [openSession] });
-    sessions.findOpenByTable.mockResolvedValue(openSession);
-    sessions.countBlockingOrders.mockResolvedValue(0);
-    sessions.close.mockResolvedValue(closedSession);
-
-    const result = await service.closeSession(
-      'outlet-1',
-      'table-1',
-      'cashier-1',
-    );
-
-    expect(result.status).toBe('CLOSED');
-    expect(tables.updateStatus).toHaveBeenCalledWith(
-      'outlet-1',
-      'table-1',
-      'AVAILABLE',
-      expect.anything(),
-    );
   });
 
   it('rejects deactivating a table with an open session', async () => {

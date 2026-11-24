@@ -17,6 +17,7 @@ import {
   ItemReportQueryDto,
   ReportDateQueryDto,
 } from './dto/report-query.dto';
+import { ReportCsvService } from './report-csv.service';
 import { ReportsService } from './reports.service';
 
 @ApiTags('admin-reports')
@@ -25,7 +26,10 @@ import { ReportsService } from './reports.service';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
 export class ReportsController {
-  constructor(private readonly reports: ReportsService) {}
+  constructor(
+    private readonly reports: ReportsService,
+    private readonly csv: ReportCsvService,
+  ) {}
 
   @Get('daily')
   @ApiOperation({ summary: 'Laporan omzet harian dan per tipe order' })
@@ -68,7 +72,7 @@ export class ReportsController {
     @Query() query: ExportReportQueryDto,
     @Res() response: Response,
   ) {
-    const file = await this.reports.exportCsv(
+    const file = await this.csv.exportCsv(
       user.outletId,
       query.type,
       query.date,
